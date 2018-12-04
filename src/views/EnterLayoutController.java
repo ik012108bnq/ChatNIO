@@ -1,6 +1,6 @@
 package views;
 
-import cliente.Main;
+import client.Main;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;

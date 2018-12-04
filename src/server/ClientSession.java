@@ -1,4 +1,4 @@
-package servidor;
+package server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -8,18 +8,19 @@ import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 
 
-public class SesionCliente{
+public class ClientSession{
 
 	private SocketChannel channel;
 	private SelectionKey selKey;
-
-	private String nombre;
+	private ByteBuffer buf;
+	private String name;
 	
-	public SesionCliente(SelectionKey selKey, SocketChannel channel)
+	public ClientSession(SelectionKey selKey, SocketChannel channel)
 	{
 		try {
 			this.selKey = selKey;
 			this.channel = (SocketChannel) channel.configureBlocking(false);
+			buf = ByteBuffer.allocate(256);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -29,10 +30,10 @@ public class SesionCliente{
 	{
 		try 
 		{
-			Servidor.clientMap.remove(selKey);
+			Server.clientMap.remove(selKey);
 			if(selKey != null) selKey.cancel();
 			if(channel == null) return;					
-			System.out.println("Cliente " + (InetSocketAddress) channel.getRemoteAddress() + " desconectado");
+			System.out.println("Client " + (InetSocketAddress) channel.getRemoteAddress() + " disconected");
 			channel.close();
 		} catch (IOException e) {		
 			e.printStackTrace();
@@ -41,11 +42,11 @@ public class SesionCliente{
 	
 	public void read()
 	{
-        ByteBuffer buf = ByteBuffer.allocate(256);
+        
 		try {
             int amount_read = -1;
-
-            amount_read = channel.read(buf);            
+            
+            amount_read = channel.read((ByteBuffer)buf.clear());            
 
             if (amount_read == -1)
                     disconnect();
@@ -53,7 +54,7 @@ public class SesionCliente{
             if (amount_read < 1)
                     return;
             
-            String input = new String(buf.array()).trim();
+            String input = new String(buf.array()).trim().substring(0, amount_read);
             if (input.charAt(0) == '#')
             {
             	int opcode = Integer.parseInt((input.substring(1, 3)));
@@ -61,12 +62,12 @@ public class SesionCliente{
             	switch (opcode)
             	{
             	case 1:
-            		this.nombre = data;
+            		this.name = data;
             		sendMyName();
             		sendMsg(nameList());
             		break;
 				default:
-					System.out.println("comando desconocido");
+					System.out.println("Unknown command");
 					break;
             	}
             	
@@ -86,6 +87,7 @@ public class SesionCliente{
 	{
 		try {
 			channel.write(buffer);
+			buffer.rewind();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -93,8 +95,8 @@ public class SesionCliente{
 	
 	private void broadcast(final ByteBuffer buffer)
 	{
-        Servidor.clientMap.forEach((k,v) ->{
-        	if (v != this) v.sendMsg(buffer);
+        Server.clientMap.forEach((k,v) ->{        	
+        	if (v.selKey != this.selKey) v.sendMsg(buffer);
         });
 	}
 	
@@ -102,18 +104,17 @@ public class SesionCliente{
 	private void sendMyName()
 	{
 		ByteBuffer bb;
-		String name = "#03".concat(this.nombre);
+		String name = "#03".concat(this.name);
 		bb = ByteBuffer.wrap(name.getBytes());
 		broadcast(bb);
-	}
-	
+	}	
 	
 	private ByteBuffer nameList()
 	{
 		String res = "#02";		
 		
-		for (HashMap.Entry<SelectionKey, SesionCliente> entry : Servidor.clientMap.entrySet()) {
-			String nombre = entry.getValue().nombre;
+		for (HashMap.Entry<SelectionKey, ClientSession> entry : Server.clientMap.entrySet()) {
+			String nombre = entry.getValue().name;
 			res = res.concat(nombre).concat(",");			
 		}
 

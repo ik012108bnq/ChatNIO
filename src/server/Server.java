@@ -1,4 +1,4 @@
-package servidor;
+package server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -10,13 +10,13 @@ import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-public class Servidor {
+public class Server {
 
-	private final int puerto = 8080;
+	private final int port = 8080;
 	private Selector selector;
 	private ServerSocketChannel serverChannel;
 	private SelectionKey serverKey;
-	static HashMap<SelectionKey, SesionCliente> clientMap = new HashMap<SelectionKey, SesionCliente>();
+	static HashMap<SelectionKey, ClientSession> clientMap = new HashMap<SelectionKey, ClientSession>();
 	
 	public void run()
 	{
@@ -24,19 +24,19 @@ public class Servidor {
 			serverChannel = ServerSocketChannel.open();
 			serverChannel.configureBlocking(false);
 			serverKey = serverChannel.register(selector = Selector.open(), SelectionKey.OP_ACCEPT);
-			serverChannel.bind(new InetSocketAddress("localhost", puerto));			
+			serverChannel.bind(new InetSocketAddress("localhost", port));			
 		
 			Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
 				loop();
-			}, 0, 500, TimeUnit.MILLISECONDS); 
+			}, 0, 50, TimeUnit.MILLISECONDS); 
 			
-			System.out.println("Servidor escuchando en el puerto: " + puerto);
+			System.out.println("Server listening on: " + port);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
-		
-	void loop()
+	
+	private void loop()
 	{
 		try {
 			selector.selectNow();			
@@ -54,13 +54,13 @@ public class Servidor {
 
                                 acceptedChannel.configureBlocking(false);
                                 SelectionKey readKey = acceptedChannel.register(selector, SelectionKey.OP_READ);
-                                clientMap.put(readKey, new SesionCliente(readKey, acceptedChannel));
+                                clientMap.put(readKey, new ClientSession(readKey, acceptedChannel));
 
-                                System.out.println("Nuevo cliente aceptado " + acceptedChannel.getRemoteAddress());
+                                System.out.println("New client " + acceptedChannel.getRemoteAddress());
                         }
 
                         if (key.isReadable()) {
-                        	SesionCliente sesh = clientMap.get(key);
+                        	ClientSession sesh = clientMap.get(key);
 
                                 if (sesh == null)
                                         continue;
